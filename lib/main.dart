@@ -1,9 +1,14 @@
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
+import 'package:the_curedesk/Contactpage.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
+
 
 void main() {
   runApp(const MyApp());
@@ -46,11 +51,66 @@ class _WebAppViewState extends State<WebAppView> {
         Permission.microphone,
         Permission.storage,
         Permission.photos,
+        Permission.contacts,
       ].request();
     } else if (Platform.isIOS) {
-      await [Permission.camera, Permission.photos].request();
+     await [Permission.camera, Permission.photos, Permission.contacts].request();
     }
   }
+  
+
+ Future<void> _pickContactAndFill() async {
+  final result = await Navigator.push<Map<String, dynamic>?>(
+    context,
+    MaterialPageRoute(builder: (_) => const ContactPickerPage()),
+  );
+
+  if (result == null || result['phone'] == null) return;
+
+  final phone = result['phone'].toString().replaceAll(" ", "");
+
+  await _controller?.evaluateJavascript(source: """
+    (function () {
+      // CHANGE THIS SELECTOR IF NEEDED
+      var input =
+        document.querySelector('input[type="tel"]') ||
+        document.querySelector('input[name*="mobile"]') ||
+        document.querySelector('input[placeholder*="mobile"]');
+
+      if (!input) {
+        console.log("Mobile input not found");
+        return;
+      }
+
+      input.value = "$phone";
+
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+
+      input.focus();
+      input.blur();
+
+      console.log("Phone injected:", "$phone");
+    })();
+  """);
+}
+
+// Future<Map<String, dynamic>?> _pickContact() async {
+//   // Request permission first
+//   PermissionStatus status = await Permission.contacts.status;
+//   if (!status.isGranted) status = await Permission.contacts.request();
+//   if (!status.isGranted) return {"error": "Permission denied"};
+
+//   // Navigate to the ContactPickerPage and wait for result
+//   final result = await Navigator.push<Map<String, dynamic>?>(
+//     context,
+//     MaterialPageRoute(
+//       builder: (context) => const ContactPickerPage(),
+//     ),
+//   );
+
+//   return result;
+// }
 
   @override
   Widget build(BuildContext context) {
@@ -65,51 +125,118 @@ class _WebAppViewState extends State<WebAppView> {
                 MediaQuery.of(context).size.height -
                 MediaQuery.of(context).padding.vertical,
             width: MediaQuery.of(context).size.width,
-            child: InAppWebView(
-              initialUrlRequest: URLRequest(
-                url: WebUri("https://clinic.thecuredesk.com"),
-              ),
-              initialSettings: InAppWebViewSettings(
-                javaScriptEnabled: true,
-                mediaPlaybackRequiresUserGesture: false,
-                allowFileAccessFromFileURLs: true,
-                allowUniversalAccessFromFileURLs: true,
-                allowFileAccess: true,
-                javaScriptCanOpenWindowsAutomatically: true,
-                // Additional settings for better compatibility
-                domStorageEnabled: true,
-                databaseEnabled: true,
-                clearCache: false,
-              ),
-              onWebViewCreated: (controller) {
-                _controller = controller;
-              },
-              // This handles camera and microphone permissions
-              androidOnPermissionRequest: (
-                controller,
-                origin,
-                resources,
-              ) async {
-                // Grant all requested permissions
-                return PermissionRequestResponse(
-                  resources: resources,
-                  action: PermissionRequestResponseAction.GRANT,
-                );
-              },
-              // iOS permission handling
-              iosOnNavigationResponse: (controller, navigationResponse) async {
-                return IOSNavigationResponseAction.ALLOW;
-              },
-              onLoadError: (controller, url, code, message) {
-                print("Load error: $message");
-              },
-              onConsoleMessage: (controller, consoleMessage) {
-                print("Console: ${consoleMessage.message}");
-              },
-              onDownloadStartRequest: (controller, request) async {
-                await _handleDownload(request.url.toString());
-              },
-            ),
+            // child: InAppWebView(
+            //   initialUrlRequest: URLRequest(
+            //     url: WebUri("https://dev-clinic.thecuredesk.com"),
+            //   ),
+            //   initialSettings: InAppWebViewSettings(
+            //     javaScriptEnabled: true,
+            //     mediaPlaybackRequiresUserGesture: false,
+            //     allowFileAccessFromFileURLs: true,
+            //     allowUniversalAccessFromFileURLs: true,
+            //     allowFileAccess: true,
+            //     javaScriptCanOpenWindowsAutomatically: true,
+            //     domStorageEnabled: true,
+            //     databaseEnabled: true,
+            //     clearCache: false,
+            //   ),
+            //   onWebViewCreated: (controller) {
+            //     _controller = controller;
+            //   },
+            //   androidOnPermissionRequest: (
+            //     controller,
+            //     origin,
+            //     resources,
+            //   ) async {
+            //     return PermissionRequestResponse(
+            //       resources: resources,
+            //       action: PermissionRequestResponseAction.GRANT,
+            //     );
+            //   },
+            //   iosOnNavigationResponse: (controller, navigationResponse) async {
+            //     return IOSNavigationResponseAction.ALLOW;
+            //   },
+            //   onLoadError: (controller, url, code, message) {
+            //     print("Load error: $message");
+            //   },
+            //   onConsoleMessage: (controller, consoleMessage) {
+            //     print("Console: ${consoleMessage.message}");
+            //   },
+            //   onDownloadStartRequest: (controller, request) async {
+            //     await _handleDownload(request.url.toString());r
+            //   },
+            // ),
+           child: InAppWebView(
+  initialUrlRequest: URLRequest(
+    url: WebUri("https://marijuana-associated-holmes-chelsea.trycloudflare.com"),
+  ),
+  initialSettings: InAppWebViewSettings(
+    javaScriptEnabled: true,
+    allowFileAccess: true,
+    allowContentAccess: true,
+    mediaPlaybackRequiresUserGesture: false,
+    domStorageEnabled: true,
+    javaScriptCanOpenWindowsAutomatically: true,
+    allowFileAccessFromFileURLs: true,
+    allowUniversalAccessFromFileURLs: true,
+    useHybridComposition: true,
+    mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+  ),
+ onWebViewCreated: (controller) {
+  _controller = controller;
+
+controller.addJavaScriptHandler(
+  handlerName: 'pickContact',
+  callback: (args) async {
+    await _pickContactAndFill();
+    return {"status": "success"};
+  },
+);
+
+},
+  /// 🔥 THIS IS THE IMPORTANT PART
+  shouldOverrideUrlLoading: (controller, navigationAction) async {
+    final uri = navigationAction.request.url;
+
+    if (uri == null) {
+      return NavigationActionPolicy.ALLOW;
+    }
+
+    // Handle phone calls
+    if (uri.scheme == "tel") {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return NavigationActionPolicy.CANCEL;
+    }
+
+    // Handle mail links (optional but recommended)
+    if (uri.scheme == "mailto") {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return NavigationActionPolicy.CANCEL;
+    }
+
+    return NavigationActionPolicy.ALLOW;
+  },
+
+  androidOnPermissionRequest: (controller, origin, resources) async {
+    return PermissionRequestResponse(
+      resources: resources,
+      action: PermissionRequestResponseAction.GRANT,
+    );
+  },
+
+  onConsoleMessage: (controller, consoleMessage) {
+    debugPrint("Console: ${consoleMessage.message}");
+  },
+
+  onDownloadStartRequest: (controller, request) async {
+    await _handleDownload(request.url.toString());
+  },
+),
+
           ),
         ),
       ),
@@ -201,4 +328,6 @@ class _WebAppViewState extends State<WebAppView> {
       ).showSnackBar(SnackBar(content: Text("Download error: $e")));
     }
   }
+
+  
 }
