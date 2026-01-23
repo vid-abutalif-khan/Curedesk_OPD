@@ -9,8 +9,8 @@ import 'package:the_curedesk/Contactpage.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 
-
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -40,7 +40,9 @@ class _WebAppViewState extends State<WebAppView> {
   @override
   void initState() {
     super.initState();
-    _requestPermissions();
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _requestPermissions();
+    });
   }
 
   Future<void> _requestPermissions() async {
@@ -54,63 +56,81 @@ class _WebAppViewState extends State<WebAppView> {
         Permission.contacts,
       ].request();
     } else if (Platform.isIOS) {
-     await [Permission.camera, Permission.photos, Permission.contacts].request();
+      await [
+        Permission.camera,
+        Permission.photos,
+        Permission.contacts,
+      ].request();
     }
   }
-  
 
- Future<void> _pickContactAndFill() async {
-  final result = await Navigator.push<Map<String, dynamic>?>(
-    context,
-    MaterialPageRoute(builder: (_) => const ContactPickerPage()),
-  );
+  Future<void> _pickContactAndFill() async {
+    final result = await Navigator.push<Map<String, dynamic>?>(
+      context,
+      MaterialPageRoute(builder: (_) => const ContactPickerPage()),
+    );
 
-  if (result == null || result['phone'] == null) return;
+    if (result == null || result['phone'] == null) return;
 
-  final phone = result['phone'].toString().replaceAll(" ", "");
+    final phone = result['phone'].toString().replaceAll(" ", "");
 
-  await _controller?.evaluateJavascript(source: """
-    (function () {
-      // CHANGE THIS SELECTOR IF NEEDED
-      var input =
-        document.querySelector('input[type="tel"]') ||
-        document.querySelector('input[name*="mobile"]') ||
-        document.querySelector('input[placeholder*="mobile"]');
+    await _controller?.evaluateJavascript(
+      source: """
+(function () {
+  function setNativeValue(element, value) {
+    const valueSetter = Object.getOwnPropertyDescriptor(element.__proto__, 'value').set;
+    const prototype = Object.getPrototypeOf(element);
+    const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
 
-      if (!input) {
-        console.log("Mobile input not found");
-        return;
-      }
+    if (valueSetter && valueSetter !== prototypeValueSetter) {
+      prototypeValueSetter.call(element, value);
+    } else {
+      valueSetter.call(element, value);
+    }
+  }
 
-      input.value = "$phone";
+  var input =
+    document.querySelector('input[type="tel"]') ||
+    document.querySelector('input[name*="mobile"]') ||
+    document.querySelector('input[placeholder*="mobile"]');
 
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
+  if (!input) {
+    console.log("Mobile input not found");
+    return;
+  }
 
-      input.focus();
-      input.blur();
+  input.focus();
+  setNativeValue(input, "$phone");
 
-      console.log("Phone injected:", "$phone");
-    })();
-  """);
-}
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+  input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
 
-// Future<Map<String, dynamic>?> _pickContact() async {
-//   // Request permission first
-//   PermissionStatus status = await Permission.contacts.status;
-//   if (!status.isGranted) status = await Permission.contacts.request();
-//   if (!status.isGranted) return {"error": "Permission denied"};
+  input.blur();
 
-//   // Navigate to the ContactPickerPage and wait for result
-//   final result = await Navigator.push<Map<String, dynamic>?>(
-//     context,
-//     MaterialPageRoute(
-//       builder: (context) => const ContactPickerPage(),
-//     ),
-//   );
+  console.log("Phone injected (native):", "$phone");
+})();
+""",
+    );
+  }
 
-//   return result;
-// }
+  // Future<Map<String, dynamic>?> _pickContact() async {
+  //   // Request permission first
+  //   PermissionStatus status = await Permission.contacts.status;
+  //   if (!status.isGranted) status = await Permission.contacts.request();
+  //   if (!status.isGranted) return {"error": "Permission denied"};
+
+  //   // Navigate to the ContactPickerPage and wait for result
+  //   final result = await Navigator.push<Map<String, dynamic>?>(
+  //     context,
+  //     MaterialPageRoute(
+  //       builder: (context) => const ContactPickerPage(),
+  //     ),
+  //   );
+
+  //   return result;
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -166,77 +186,80 @@ class _WebAppViewState extends State<WebAppView> {
             //     await _handleDownload(request.url.toString());r
             //   },
             // ),
-           child: InAppWebView(
-  initialUrlRequest: URLRequest(
-    url: WebUri("https://marijuana-associated-holmes-chelsea.trycloudflare.com"),
-  ),
-  initialSettings: InAppWebViewSettings(
-    javaScriptEnabled: true,
-    allowFileAccess: true,
-    allowContentAccess: true,
-    mediaPlaybackRequiresUserGesture: false,
-    domStorageEnabled: true,
-    javaScriptCanOpenWindowsAutomatically: true,
-    allowFileAccessFromFileURLs: true,
-    allowUniversalAccessFromFileURLs: true,
-    useHybridComposition: true,
-    mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
-  ),
- onWebViewCreated: (controller) {
-  _controller = controller;
+            child: InAppWebView(
+              initialUrlRequest: URLRequest(
+                url: WebUri("https://clinic.thecuredesk.com/"),
+              ),
+              initialSettings: InAppWebViewSettings(
+                javaScriptEnabled: true,
+                allowFileAccess: true,
+                allowContentAccess: true,
+                mediaPlaybackRequiresUserGesture: false,
+                domStorageEnabled: true,
+                javaScriptCanOpenWindowsAutomatically: true,
+                allowFileAccessFromFileURLs: true,
+                allowUniversalAccessFromFileURLs: true,
+                useHybridComposition: true,
+                mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+              ),
+              onWebViewCreated: (controller) {
+                _controller = controller;
 
-controller.addJavaScriptHandler(
-  handlerName: 'pickContact',
-  callback: (args) async {
-    await _pickContactAndFill();
-    return {"status": "success"};
-  },
-);
+                controller.addJavaScriptHandler(
+                  handlerName: 'pickContact',
+                  callback: (args) async {
+                    await _pickContactAndFill();
+                    return {"status": "success"};
+                  },
+                );
+              },
 
-},
-  /// 🔥 THIS IS THE IMPORTANT PART
-  shouldOverrideUrlLoading: (controller, navigationAction) async {
-    final uri = navigationAction.request.url;
+              /// 🔥 THIS IS THE IMPORTANT PART
+              shouldOverrideUrlLoading: (controller, navigationAction) async {
+                final uri = navigationAction.request.url;
 
-    if (uri == null) {
-      return NavigationActionPolicy.ALLOW;
-    }
+                if (uri == null) {
+                  return NavigationActionPolicy.ALLOW;
+                }
 
-    // Handle phone calls
-    if (uri.scheme == "tel") {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-      return NavigationActionPolicy.CANCEL;
-    }
+                // Handle phone calls
+                if (uri.scheme == "tel") {
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                  return NavigationActionPolicy.CANCEL;
+                }
 
-    // Handle mail links (optional but recommended)
-    if (uri.scheme == "mailto") {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-      return NavigationActionPolicy.CANCEL;
-    }
+                // Handle mail links (optional but recommended)
+                if (uri.scheme == "mailto") {
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                  return NavigationActionPolicy.CANCEL;
+                }
 
-    return NavigationActionPolicy.ALLOW;
-  },
+                return NavigationActionPolicy.ALLOW;
+              },
 
-  androidOnPermissionRequest: (controller, origin, resources) async {
-    return PermissionRequestResponse(
-      resources: resources,
-      action: PermissionRequestResponseAction.GRANT,
-    );
-  },
+              androidOnPermissionRequest: (
+                controller,
+                origin,
+                resources,
+              ) async {
+                return PermissionRequestResponse(
+                  resources: resources,
+                  action: PermissionRequestResponseAction.GRANT,
+                );
+              },
 
-  onConsoleMessage: (controller, consoleMessage) {
-    debugPrint("Console: ${consoleMessage.message}");
-  },
+              onConsoleMessage: (controller, consoleMessage) {
+                debugPrint("Console: ${consoleMessage.message}");
+              },
 
-  onDownloadStartRequest: (controller, request) async {
-    await _handleDownload(request.url.toString());
-  },
-),
-
+              onDownloadStartRequest: (controller, request) async {
+                await _handleDownload(request.url.toString());
+              },
+            ),
           ),
         ),
       ),
@@ -328,6 +351,4 @@ controller.addJavaScriptHandler(
       ).showSnackBar(SnackBar(content: Text("Download error: $e")));
     }
   }
-
-  
 }
