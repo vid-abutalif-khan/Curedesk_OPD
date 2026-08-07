@@ -188,7 +188,7 @@ class _WebAppViewState extends State<WebAppView> {
             // ),
             child: InAppWebView(
               initialUrlRequest: URLRequest(
-                url: WebUri("https://clinic.thecuredesk.com/"),
+                url: WebUri("https://dental.dizirx.com/"),
               ),
               initialSettings: InAppWebViewSettings(
                 javaScriptEnabled: true,
